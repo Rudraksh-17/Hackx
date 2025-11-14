@@ -1,34 +1,35 @@
+import streamlit as st
+import pandas as pd
 import sqlite3
+import plotly.express as px
 from datetime import datetime
 
+# NEW: AI audit deps
 import cv2
 import numpy as np
-import pandas as pd
-import plotly.express as px
-import streamlit as st
 
 # ==================== DATABASE SETUP ====================
 conn = sqlite3.connect("aid_system.db", check_same_thread=False)
 cur = conn.cursor()
 
 cur.execute(
-    """CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT,
-    role TEXT
-)"""
+    '''CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        role TEXT
+    )'''
 )
 
 cur.execute(
-    """CREATE TABLE IF NOT EXISTS aid_records(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    donor TEXT,
-    beneficiary TEXT,
-    amount REAL,
-    date TEXT,
-    status TEXT
-)"""
+    '''CREATE TABLE IF NOT EXISTS aid_records(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        donor TEXT,
+        beneficiary TEXT,
+        amount REAL,
+        date TEXT,
+        status TEXT
+    )'''
 )
 
 conn.commit()
@@ -38,59 +39,32 @@ st.set_page_config(
     page_title="Aid Auditing Platform",
     page_icon="🛰️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="collapsed"
 )
 
-css_lines = [
-    "<style>",
-    (
-        ".stApp { background: radial-gradient(1200px 600px at 20% 0%,"
-        " #1d2733 0%, #11161b 40%, #0a0f14 100%) !important; }"
-    ),
-    "h1, h2, h3, .main-title { color: #e6f1ff; letter-spacing: .2px; }",
-    "/* Hero */",
-    (
-        ".hero { border-radius: 20px; padding: 28px; background:"
-        " linear-gradient(145deg, rgba(15,21,32,.9), rgba(18,26,38,.9));"
-    ),
-    (
-        "         border: 1px solid rgba(255,255,255,.06);"
-        " box-shadow: 0 16px 36px rgba(0,0,0,.35),"
-        " inset 0 1px 0 rgba(255,255,255,.04); }"
-    ),
-    ".hero h1 { margin: 0 0 6px 0; font-size: 1.8rem; }",
-    ".sub { color:#9fb4c7; }",
-    "/* Metric cards */",
-    (
-        ".metric-card { border-radius: 16px; padding: 18px 18px 12px;"
-        " background: linear-gradient(145deg, #0f1520, #121a26);"
-    ),
-    (
-        "               border: 1px solid rgba(255,255,255,.06);"
-        " box-shadow: 0 10px 24px rgba(0,0,0,.35),"
-        " inset 0 1px 0 rgba(255,255,255,.04); }"
-    ),
-    ".metric-label { color: #8ca3b8; font-size: .85rem; }",
-    ".metric-value { color: #e8f2ff; font-size: 1.6rem; font-weight: 700; }",
-    "/* Chips */",
-    (
-        ".chip { display:inline-flex; align-items:center; gap:8px;"
-        " padding:6px 10px; border-radius:999px;"
-    ),
-    (
-        "        background:rgba(0,191,255,.12); color:#aee4ff;"
-        " font-size:.85rem; border:1px solid rgba(0,191,255,.25); }"
-    ),
-    "/* Tables */",
-    ".dataframe thead tr th { background: #0e141c !important; color:#adc1d1 !important; }",
-    "</style>",
-]
-
-st.markdown("\n".join(css_lines), unsafe_allow_html=True)
+st.markdown("""
+<style>
+.stApp { background: radial-gradient(1200px 600px at 20% 0%, #1d2733 0%, #11161b 40%, #0a0f14 100%) !important; }
+h1, h2, h3, .main-title { color: #e6f1ff; letter-spacing: .2px; }
+/* Hero */
+.hero { border-radius: 20px; padding: 28px; background: linear-gradient(145deg, rgba(15,21,32,.9), rgba(18,26,38,.9));
+         border: 1px solid rgba(255,255,255,.06); box-shadow: 0 16px 36px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
+.hero h1 { margin: 0 0 6px 0; font-size: 1.8rem; }
+.sub { color:#9fb4c7; }
+/* Metric cards */
+.metric-card { border-radius: 16px; padding: 18px 18px 12px; background: linear-gradient(145deg, #0f1520, #121a26);
+               border: 1px solid rgba(255,255,255,.06); box-shadow: 0 10px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }
+.metric-label { color: #8ca3b8; font-size: .85rem; }
+.metric-value { color: #e8f2ff; font-size: 1.6rem; font-weight: 700; }
+/* Chips */
+.chip { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px;
+        background:rgba(0,191,255,.12); color:#aee4ff; font-size:.85rem; border:1px solid rgba(0,191,255,.25); }
+/* Tables */
+.dataframe thead tr th { background: #0e141c !important; color:#adc1d1 !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # ==================== HELPERS ====================
-
-
 def add_user(username, password, role="user"):
     try:
         cur.execute(
@@ -122,8 +96,7 @@ def refresh_cache():
 def add_aid_record(donor, beneficiary, amount, status, date_str=None):
     date_str = date_str or datetime.now().strftime("%Y-%m-%d")
     cur.execute(
-        "INSERT INTO aid_records (donor, beneficiary, amount, date, status)"
-        " VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO aid_records (donor, beneficiary, amount, date, status) VALUES (?, ?, ?, ?, ?)",
         (donor, beneficiary, amount, date_str, status),
     )
     conn.commit()
@@ -142,7 +115,6 @@ def human_currency(x):
     except Exception:
         return "$0.00"
 
-
 # ==================== AI IMAGE AUDIT (INTEGRATED) ====================
 # Config
 HAMMING_THRESHOLD = 5
@@ -156,11 +128,9 @@ def calculate_dhash(image_bytes, hash_size=8):
         if image is None:
             st.error("Invalid image data. Please upload a valid JPG/PNG.")
             return None
-
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         resized = cv2.resize(gray, (hash_size + 1, hash_size))
         diff = resized[:, :-1] > resized[:, 1:]
-
         # pack bits into a 64-bit integer
         dhash = 0
         for i, bit in enumerate(diff.flatten()):
@@ -180,9 +150,12 @@ def hamming_distance(hash1, hash2):
 @st.cache_data
 def generate_mock_hashes():
     """Deterministic mock hashes simulating ledger records."""
-    original = np.uint64(0x40808183878F9FBF)
-    unique = np.uint64(0xFFFFFFFFFFFFFFFF)
-    return [("Recorded Photo #1 (Original)", original), ("Recorded Photo #2 (Unique)", unique)]
+    original_hash_mock = np.uint64(0x40808183878F9FBF)
+    unique_hash_mock = np.uint64(0xFFFFFFFFFFFFFFFF)
+    return [
+        ("Recorded Photo #1 (Original)", original_hash_mock),
+        ("Recorded Photo #2 (Unique)", unique_hash_mock),
+    ]
 
 
 def audit_submission(new_hash, existing_hashes):
@@ -195,17 +168,18 @@ def audit_submission(new_hash, existing_hashes):
         st.text(f"  → Hamming Distance: {distance}")
         if distance <= HAMMING_THRESHOLD:
             st.error(
-                "🚫 AUDIT FAILED: Near-duplicate detected "
-                f"(distance {distance} ≤ {HAMMING_THRESHOLD})."
+                f"🚫 AUDIT FAILED: Near-duplicate detected (distance {distance} ≤ {HAMMING_THRESHOLD})."
             )
             flagged = True
             break
-
     if not flagged:
-        st.success("✅ AUDIT SUCCESS: Photo appears unique. Ready for blockchain logging.")
+        st.success(
+            "✅ AUDIT SUCCESS: Photo appears unique. Ready for blockchain logging."
+        )
     return not flagged
 
 
+# A modal popup for the whole audit flow (requires Streamlit ≥ 1.31)
 def render_ai_audit_dialog():
     existing_records = generate_mock_hashes()
     uploaded_file = st.file_uploader(
@@ -229,20 +203,15 @@ def render_ai_audit_dialog():
     else:
         st.info("Please upload an image to begin the audit.")
 
-
 # ==================== SESSION STATE ====================
 if "user" not in st.session_state:
     st.session_state.user = None
-
 if "show_login" not in st.session_state:
     st.session_state.show_login = False
-
 if "show_signup" not in st.session_state:
     st.session_state.show_signup = False
-
 if "show_ai_audit" not in st.session_state:
     st.session_state.show_ai_audit = False
-
 
 # ==================== DIALOGS (POPUPS) ====================
 has_dialog = hasattr(st, "dialog")
@@ -254,12 +223,10 @@ if has_dialog:
             u = st.text_input("Username", placeholder="jane_doe")
             p = st.text_input("Password", type="password", placeholder="••••••••")
             submitted = st.form_submit_button("Login")
-
         colx, coly = st.columns(2)
         if colx.button("Close", use_container_width=True):
             st.session_state.show_login = False
             st.rerun()
-
         if submitted:
             user = verify_user(u.strip(), p)
             if user:
@@ -274,17 +241,13 @@ if has_dialog:
     def signup_dialog():
         with st.form("signup_form"):
             u = st.text_input("Choose a username", placeholder="jane_doe")
-            p = st.text_input(
-                "Choose a password", type="password", placeholder="Strong & memorable"
-            )
+            p = st.text_input("Choose a password", type="password", placeholder="Strong & memorable")
             role = st.selectbox("Role", ["user", "admin"])
             submitted = st.form_submit_button("Create Account")
-
         colx, coly = st.columns(2)
         if colx.button("Close", use_container_width=True):
             st.session_state.show_signup = False
             st.rerun()
-
         if submitted:
             if not u or not p:
                 st.warning("Please fill all fields.")
@@ -313,28 +276,26 @@ else:
     def ai_audit_dialog():
         pass
 
-
 # ==================== ROUTING ====================
 if st.session_state.user is None:
     # -------- HOME PAGE WITH POPUPS --------
     col = st.columns([1, 1, 1])[1]
     with col:
         st.markdown(
-            (
-                "<div class=\"hero\">"
-                "  <h1>🛰️ Disaster Aid Auditing Platform</h1>"
-                "  <div class=\"sub\">Transparency • Traceability • Trust</div>"
-                "  <div style=\"margin-top:12px;\">"
-                "    <span class=\"chip\">Secure by design</span>"
-                "    <span class=\"chip\">SQLite local</span>"
-                "    <span class=\"chip\">Plotly dashboards</span>"
-                "  </div>"
-                "</div>"
-            ),
+            """
+            <div class="hero">
+              <h1>🛰️ Disaster Aid Auditing Platform</h1>
+              <div class="sub">Transparency • Traceability • Trust</div>
+              <div style="margin-top:12px;">
+                <span class="chip">Secure by design</span>
+                <span class="chip">SQLite local</span>
+                <span class="chip">Plotly dashboards</span>
+              </div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
         st.write("")
-
         b1, b2, b3 = st.columns(3)
         with b1:
             if st.button("Login", use_container_width=True):
@@ -352,10 +313,7 @@ if st.session_state.user is None:
                 st.write("Track donors → beneficiaries with full visibility. Audit, filter, and export.")
         with info_cols[1]:
             with st.popover("How it works"):
-                st.markdown(
-                    "- Create an account\n- Add aid records\n- Use Dashboard to filter & export\n"
-                    "- Admins can bulk delete\n- Use **AI Audit** to check duplicate photos"
-                )
+                st.markdown("- Create an account\n- Add aid records\n- Use Dashboard to filter & export\n- Admins can bulk delete\n- Use **AI Audit** to check duplicate photos")
         with info_cols[2]:
             with st.popover("Contact"):
                 st.write("support@aidplatform.org\n\nEY Disaster Relief Center, India\n\n+91-9876543210")
@@ -365,27 +323,14 @@ if st.session_state.user is None:
         total = df["amount"].sum() if not df.empty else 0
         ver = int((df["status"] == "Verified").sum()) if not df.empty else 0
         pen = int((df["status"] == "Pending").sum()) if not df.empty else 0
-
         st.write("")
         k1, k2, k3 = st.columns(3)
         with k1:
-            st.markdown(
-                '<div class="metric-card"><div class="metric-label">Total Aid</div>'
-                f'<div class="metric-value">{human_currency(total)}</div></div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Total Aid</div><div class="metric-value">{human_currency(total)}</div></div>', unsafe_allow_html=True)
         with k2:
-            st.markdown(
-                '<div class="metric-card"><div class="metric-label">Verified</div>'
-                f'<div class="metric-value">{ver}</div></div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Verified</div><div class="metric-value">{ver}</div></div>', unsafe_allow_html=True)
         with k3:
-            st.markdown(
-                '<div class="metric-card"><div class="metric-label">Pending</div>'
-                f'<div class="metric-value">{pen}</div></div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value">{pen}</div></div>', unsafe_allow_html=True)
 
     # Open dialogs if toggled
     if has_dialog and st.session_state.show_login:
@@ -394,7 +339,6 @@ if st.session_state.user is None:
         signup_dialog()
     if has_dialog and st.session_state.show_ai_audit:
         ai_audit_dialog()
-
 else:
     # -------- APP (POST-AUTH) --------
     user = st.session_state.user
@@ -404,15 +348,7 @@ else:
         st.markdown(f"### 👋 {username}\n**Role:** `{role}`")
         menu = st.radio(
             "Navigation",
-            [
-                "🏠 Home",
-                "📊 Dashboard",
-                "➕ Add Aid",
-                "🗂️ Records",
-                "🧠 AI Audit",
-                "📞 Contact",
-                "🛠 Admin",
-            ],
+            ["🏠 Home", "📊 Dashboard", "➕ Add Aid", "🗂️ Records", "🧠 AI Audit", "📞 Contact", "🛠 Admin"],
         )
         st.markdown("---")
         if st.button("🚪 Logout"):
@@ -432,23 +368,11 @@ else:
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(
-                '<div class="metric-card"><div class="metric-label">Total Aid</div>'
-                f'<div class="metric-value">{human_currency(total)}</div></div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Total Aid</div><div class="metric-value">{human_currency(total)}</div></div>', unsafe_allow_html=True)
         with c2:
-            st.markdown(
-                '<div class="metric-card"><div class="metric-label">Verified</div>'
-                f'<div class="metric-value">{ver}</div></div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Verified</div><div class="metric-value">{ver}</div></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown(
-                '<div class="metric-card"><div class="metric-label">Pending</div>'
-                f'<div class="metric-value">{pen}</div></div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value">{pen}</div></div>', unsafe_allow_html=True)
 
     # ==================== DASHBOARD ====================
     elif menu == "📊 Dashboard":
@@ -468,13 +392,13 @@ else:
                     amount_range = st.slider("Amount range", min_amt, max_amt, (min_amt, max_amt))
 
             fdf = df.copy()
-            if "donor_filter" in locals() and donor_filter:
+            if 'donor_filter' in locals() and donor_filter:
                 fdf = fdf[fdf["donor"].str.contains(donor_filter, case=False, na=False)]
-            if "bene_filter" in locals() and bene_filter:
+            if 'bene_filter' in locals() and bene_filter:
                 fdf = fdf[fdf["beneficiary"].str.contains(bene_filter, case=False, na=False)]
-            if "status_filter" in locals() and status_filter:
+            if 'status_filter' in locals() and status_filter:
                 fdf = fdf[fdf["status"].isin(status_filter)]
-            if "amount_range" in locals():
+            if 'amount_range' in locals():
                 fdf = fdf[(fdf["amount"] >= amount_range[0]) & (fdf["amount"] <= amount_range[1])]
 
             total = fdf["amount"].sum() if not fdf.empty else 0
@@ -482,29 +406,24 @@ else:
             pen = int((fdf["status"] == "Pending").sum()) if not fdf.empty else 0
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.markdown(
-                    '<div class="metric-card"><div class="metric-label">Total (Filtered)</div>'
-                    f'<div class="metric-value">{human_currency(total)}</div></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-card"><div class="metric-label">Total (Filtered)</div><div class="metric-value">{human_currency(total)}</div></div>', unsafe_allow_html=True)
             with c2:
-                st.markdown(
-                    '<div class="metric-card"><div class="metric-label">Verified</div>'
-                    f'<div class="metric-value">{ver}</div></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-card"><div class="metric-label">Verified</div><div class="metric-value">{ver}</div></div>', unsafe_allow_html=True)
             with c3:
-                st.markdown(
-                    '<div class="metric-card"><div class="metric-label">Pending</div>'
-                    f'<div class="metric-value">{pen}</div></div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value">{pen}</div></div>', unsafe_allow_html=True)
 
             fdf["date"] = pd.to_datetime(fdf["date"], errors="coerce")
             chart_cols = st.columns(2)
 
             with chart_cols[0]:
-                pie = px.pie(fdf, names="status", values="amount", title="Aid by Status", hole=.35, template="plotly_dark")
+                pie = px.pie(
+                    fdf,
+                    names="status",
+                    values="amount",
+                    title="Aid by Status",
+                    hole=.35,
+                    template="plotly_dark",
+                )
                 st.plotly_chart(pie, use_container_width=True)
 
             with chart_cols[1]:
@@ -512,7 +431,13 @@ else:
                 if not monthly.empty:
                     monthly["month"] = monthly["date"].dt.to_period("M").astype(str)
                     agg = monthly.groupby("month", as_index=False)["amount"].sum()
-                    bar = px.bar(agg, x="month", y="amount", title="Monthly Aid (Sum)", template="plotly_dark")
+                    bar = px.bar(
+                        agg,
+                        x="month",
+                        y="amount",
+                        title="Monthly Aid (Sum)",
+                        template="plotly_dark",
+                    )
                     bar.update_layout(xaxis_title="", yaxis_title="Amount")
                     st.plotly_chart(bar, use_container_width=True)
                 else:
@@ -520,12 +445,22 @@ else:
 
             left, right = st.columns([3, 1])
             with left:
-                td = fdf.groupby("donor", as_index=False)["amount"].sum().sort_values("amount", ascending=False).head(10)
+                td = (
+                    fdf.groupby("donor", as_index=False)["amount"]
+                    .sum()
+                    .sort_values("amount", ascending=False)
+                    .head(10)
+                )
                 with st.popover("Top Donors (filtered)"):
                     st.dataframe(td, use_container_width=True)
             with right:
                 csv = fdf.to_csv(index=False).encode("utf-8")
-                st.download_button("⬇️ Export filtered CSV", data=csv, file_name="aid_records_filtered.csv", mime="text/csv")
+                st.download_button(
+                    "⬇️ Export filtered CSV",
+                    data=csv,
+                    file_name="aid_records_filtered.csv",
+                    mime="text/csv",
+                )
 
             st.markdown("#### Records (filtered)")
             st.dataframe(fdf.sort_values("date", ascending=False), use_container_width=True)
@@ -544,10 +479,15 @@ else:
                 with coly:
                     date_input = st.date_input("Date", value=datetime.now())
                 submitted = st.form_submit_button("Add Record")
-
             if submitted:
                 if donor.strip() and beneficiary.strip():
-                    add_aid_record(donor.strip(), beneficiary.strip(), amount, status, date_input.strftime("%Y-%m-%d"))
+                    add_aid_record(
+                        donor.strip(),
+                        beneficiary.strip(),
+                        amount,
+                        status,
+                        date_input.strftime("%Y-%m-%d"),
+                    )
                     st.success("Aid record added successfully!")
                     st.toast("Record saved ✅", icon="💾")
                     st.rerun()
@@ -639,4 +579,3 @@ else:
                         delete_records(selected_ids)
                         st.success(f"Deleted {len(selected_ids)} record(s).")
                         st.rerun()
-
