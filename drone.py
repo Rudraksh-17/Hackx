@@ -731,3 +731,4 @@ else:
                         st.success(f"Deleted {len(selected_ids)} record(s).")
                         st.rerun()
 # ...existing code...
+
