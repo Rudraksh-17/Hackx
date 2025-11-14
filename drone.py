@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -510,6 +510,7 @@ else:
                         delete_records(selected_ids)
                         st.success(f"Deleted {len(selected_ids)} record(s).")
                         st.rerun()
+
 =======
 import streamlit as st
 import pandas as pd
@@ -1022,4 +1023,3 @@ else:
                         delete_records(selected_ids)
                         st.success(f"Deleted {len(selected_ids)} record(s).")
                         st.rerun()
->>>>>>> c2c3b51 (Initial push to Hackx repo)
