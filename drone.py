@@ -10,10 +10,8 @@ import streamlit as st
 
 # ==================== DATABASE SETUP ====================
 
-
 conn = sqlite3.connect("aid_system.db", check_same_thread=False)
 cur = conn.cursor()
-
 
 cur.execute(
     """
@@ -42,7 +40,6 @@ CREATE TABLE IF NOT EXISTS aid_records(
 conn.commit()
 
 # ==================== PAGE SETTINGS & GLOBAL STYLE ====================
-
 
 st.set_page_config(
     page_title="Aid Auditing Platform",
@@ -104,7 +101,8 @@ def add_user(username: str, password: str, role: str = "user") -> bool:
 def verify_user(username: str, password: str):
     """Return user row if credentials match else None."""
     cur.execute(
-        "SELECT * FROM users WHERE username=? AND password=?", (username, password)
+        "SELECT * FROM users WHERE username=? AND password=?",
+        (username, password)
     )
     return cur.fetchone()
 
@@ -129,12 +127,13 @@ def add_aid_record(
     beneficiary: str,
     amount: float,
     status: str,
-    date_str: str | None = None,
+    date_str: str = None,
 ) -> None:
     """Insert an aid record and refresh cache."""
     date_str = date_str or datetime.now().strftime("%Y-%m-%d")
     cur.execute(
-        "INSERT INTO aid_records (donor, beneficiary, amount, date, status) "
+        "INSERT INTO aid_records "
+        "(donor, beneficiary, amount, date, status) "
         "VALUES (?, ?, ?, ?, ?)",
         (donor, beneficiary, amount, date_str, status),
     )
@@ -144,7 +143,10 @@ def add_aid_record(
 
 def delete_records(record_ids: list) -> None:
     """Delete records by id list and refresh cache."""
-    cur.executemany("DELETE FROM aid_records WHERE id=?", [(int(rid),) for rid in record_ids])
+    cur.executemany(
+        "DELETE FROM aid_records WHERE id=?",
+        [(int(rid),) for rid in record_ids]
+    )
     conn.commit()
     refresh_cache()
 
@@ -158,7 +160,6 @@ def human_currency(x) -> str:
 
 
 # ==================== AI IMAGE AUDIT (INTEGRATED) ====================
-
 
 HAMMING_THRESHOLD = 5
 
@@ -192,11 +193,11 @@ def hamming_distance(hash1, hash2) -> int:
 @st.cache_data
 def generate_mock_hashes() -> list:
     """Create deterministic mock hashes to simulate ledger records."""
-    ORIGINAL_HASH_MOCK = np.uint64(0x40808183878F9FBF)
-    UNIQUE_HASH_MOCK = np.uint64(0xFFFFFFFFFFFFFFFF)
+    original_hash_mock = np.uint64(0x40808183878F9FBF)
+    unique_hash_mock = np.uint64(0xFFFFFFFFFFFFFFFF)
     return [
-        ("Recorded Photo #1 (Original)", ORIGINAL_HASH_MOCK),
-        ("Recorded Photo #2 (Unique)", UNIQUE_HASH_MOCK),
+        ("Recorded Photo #1 (Original)", original_hash_mock),
+        ("Recorded Photo #2 (Unique)", unique_hash_mock),
     ]
 
 
@@ -206,18 +207,21 @@ def audit_submission(new_hash, existing_hashes) -> bool:
     flagged = False
     for description, existing_hash in existing_hashes:
         distance = hamming_distance(new_hash, existing_hash)
-        st.caption(f"Comparing with existing record **{description}** …")
+        st.caption(
+            f"Comparing with existing record **{description}** …"
+        )
         st.text(f"  → Hamming Distance: {distance}")
         if distance <= HAMMING_THRESHOLD:
             st.error(
-                f"🚫 AUDIT FAILED: Near-duplicate detected (distance "
-                f"{distance} ≤ {HAMMING_THRESHOLD})."
+                f"🚫 AUDIT FAILED: Near-duplicate detected "
+                f"(distance {distance} ≤ {HAMMING_THRESHOLD})."
             )
             flagged = True
             break
     if not flagged:
         st.success(
-            "✅ AUDIT SUCCESS: Photo appears unique. Ready for blockchain logging."
+            "✅ AUDIT SUCCESS: Photo appears unique. "
+            "Ready for blockchain logging."
         )
     return not flagged
 
@@ -232,7 +236,11 @@ def render_ai_audit_dialog() -> None:
     if uploaded_file is not None:
         c1, c2 = st.columns(2)
         with c1:
-            st.image(uploaded_file, caption="Submitted Photo", use_column_width=True)
+            st.image(
+                uploaded_file,
+                caption="Submitted Photo",
+                use_column_width=True
+            )
         with c2:
             st.subheader("Audit Report")
             if st.button("Run Image Audit", use_container_width=True):
@@ -249,7 +257,6 @@ def render_ai_audit_dialog() -> None:
 
 # ==================== SESSION STATE ====================
 
-
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -262,12 +269,9 @@ if "show_signup" not in st.session_state:
 if "show_ai_audit" not in st.session_state:
     st.session_state.show_ai_audit = False
 
-
 # ==================== DIALOGS (POPUPS) ====================
 
-
 has_dialog = hasattr(st, "dialog")
-
 
 if has_dialog:
 
@@ -298,7 +302,8 @@ if has_dialog:
         with st.form("signup_form"):
             u = st.text_input("Choose a username", placeholder="jane_doe")
             p = st.text_input(
-                "Choose a password", type="password", placeholder="Strong & memorable"
+                "Choose a password", type="password",
+                placeholder="Strong & memorable"
             )
             role = st.selectbox("Role", ["user", "admin"])
             submitted = st.form_submit_button("Create Account")
@@ -330,17 +335,13 @@ else:
     def login_dialog():
         pass
 
-
     def signup_dialog():
         pass
-
 
     def ai_audit_dialog():
         pass
 
-
 # ==================== ROUTING & UI ====================
-
 
 if st.session_state.user is None:
     # -------- HOME PAGE WITH POPUPS --------
@@ -376,14 +377,18 @@ if st.session_state.user is None:
         info_cols = st.columns([1, 1, 1])
         with info_cols[0]:
             with st.popover("About"):
-                st.write("Track donors → beneficiaries with full visibility. Audit, "
-                         "filter, and export.")
+                st.write(
+                    "Track donors → beneficiaries with full visibility. "
+                    "Audit, filter, and export."
+                )
         with info_cols[1]:
             with st.popover("How it works"):
                 st.markdown(
-                    "- Create an account\n- Add aid records\n- Use Dashboard to "
-                    "filter & export\n- Admins can bulk delete\n- Use "
-                    "**AI Audit** to check duplicate photos"
+                    "- Create an account\n"
+                    "- Add aid records\n"
+                    "- Use Dashboard to filter & export\n"
+                    "- Admins can bulk delete\n"
+                    "- Use **AI Audit** to check duplicate photos"
                 )
         with info_cols[2]:
             with st.popover("Contact"):
@@ -402,24 +407,24 @@ if st.session_state.user is None:
         with k1:
             st.markdown(
                 (
-                    "<div class='metric-card'><div class='metric-label'>Total Aid"
-                    "</div><div class='metric-value'>{}</div></div>"
+                    "<div class='metric-card'><div class='metric-label'>"
+                    "Total Aid</div><div class='metric-value'>{}</div></div>"
                 ).format(human_currency(total)),
                 unsafe_allow_html=True,
             )
         with k2:
             st.markdown(
                 (
-                    "<div class='metric-card'><div class='metric-label'>Verified"
-                    "</div><div class='metric-value'>{}</div></div>"
+                    "<div class='metric-card'><div class='metric-label'>"
+                    "Verified</div><div class='metric-value'>{}</div></div>"
                 ).format(ver),
                 unsafe_allow_html=True,
             )
         with k3:
             st.markdown(
                 (
-                    "<div class='metric-card'><div class='metric-label'>Pending"
-                    "</div><div class='metric-value'>{}</div></div>"
+                    "<div class='metric-card'><div class='metric-label'>"
+                    "Pending</div><div class='metric-value'>{}</div></div>"
                 ).format(pen),
                 unsafe_allow_html=True,
             )
@@ -477,24 +482,24 @@ else:
         with c1:
             st.markdown(
                 (
-                    "<div class='metric-card'><div class='metric-label'>Total Aid"
-                    "</div><div class='metric-value'>{}</div></div>"
+                    "<div class='metric-card'><div class='metric-label'>"
+                    "Total Aid</div><div class='metric-value'>{}</div></div>"
                 ).format(human_currency(total)),
                 unsafe_allow_html=True,
             )
         with c2:
             st.markdown(
                 (
-                    "<div class='metric-card'><div class='metric-label'>Verified"
-                    "</div><div class='metric-value'>{}</div></div>"
+                    "<div class='metric-card'><div class='metric-label'>"
+                    "Verified</div><div class='metric-value'>{}</div></div>"
                 ).format(ver),
                 unsafe_allow_html=True,
             )
         with c3:
             st.markdown(
                 (
-                    "<div class='metric-card'><div class='metric-label'>Pending"
-                    "</div><div class='metric-value'>{}</div></div>"
+                    "<div class='metric-card'><div class='metric-label'>"
+                    "Pending</div><div class='metric-value'>{}</div></div>"
                 ).format(pen),
                 unsafe_allow_html=True,
             )
@@ -511,19 +516,26 @@ else:
                 with fl1:
                     donor_filter = st.text_input("Filter by Donor")
                     status_filter = st.multiselect(
-                        "Status", ["Pending", "Verified"], default=["Pending", "Verified"]
+                        "Status",
+                        ["Pending", "Verified"],
+                        default=["Pending", "Verified"]
                     )
                 with fl2:
                     bene_filter = st.text_input("Filter by Beneficiary")
                     min_amt = float(df["amount"].min())
                     max_amt = float(df["amount"].max())
                     amount_range = st.slider(
-                        "Amount range", min_amt, max_amt, (min_amt, max_amt)
+                        "Amount range",
+                        min_amt,
+                        max_amt,
+                        (min_amt, max_amt)
                     )
 
             fdf = df.copy()
             if "donor_filter" in locals() and donor_filter:
-                fdf = fdf[fdf["donor"].str.contains(donor_filter, case=False, na=False)]
+                fdf = fdf[
+                    fdf["donor"].str.contains(donor_filter, case=False, na=False)
+                ]
             if "bene_filter" in locals() and bene_filter:
                 fdf = fdf[
                     fdf["beneficiary"].str.contains(bene_filter, case=False, na=False)
@@ -532,7 +544,8 @@ else:
                 fdf = fdf[fdf["status"].isin(status_filter)]
             if "amount_range" in locals():
                 fdf = fdf[
-                    (fdf["amount"] >= amount_range[0]) & (fdf["amount"] <= amount_range[1])
+                    (fdf["amount"] >= amount_range[0]) &
+                    (fdf["amount"] <= amount_range[1])
                 ]
 
             total = fdf["amount"].sum() if not fdf.empty else 0
@@ -542,24 +555,25 @@ else:
             with c1:
                 st.markdown(
                     (
-                        "<div class='metric-card'><div class='metric-label'>Total "
-                        "(Filtered)</div><div class='metric-value'>{}</div></div>"
+                        "<div class='metric-card'><div class='metric-label'>"
+                        "Total (Filtered)</div><div class='metric-value'>{}"
+                        "</div></div>"
                     ).format(human_currency(total)),
                     unsafe_allow_html=True,
                 )
             with c2:
                 st.markdown(
                     (
-                        "<div class='metric-card'><div class='metric-label'>Verified"
-                        "</div><div class='metric-value'>{}</div></div>"
+                        "<div class='metric-card'><div class='metric-label'>"
+                        "Verified</div><div class='metric-value'>{}</div></div>"
                     ).format(ver),
                     unsafe_allow_html=True,
                 )
             with c3:
                 st.markdown(
                     (
-                        "<div class='metric-card'><div class='metric-label'>Pending"
-                        "</div><div class='metric-value'>{}</div></div>"
+                        "<div class='metric-card'><div class='metric-label'>"
+                        "Pending</div><div class='metric-value'>{}</div></div>"
                     ).format(pen),
                     unsafe_allow_html=True,
                 )
@@ -569,17 +583,26 @@ else:
 
             with chart_cols[0]:
                 pie = px.pie(
-                    fdf, names="status", values="amount", title="Aid by Status", hole=0.35
+                    fdf,
+                    names="status",
+                    values="amount",
+                    title="Aid by Status",
+                    hole=0.35
                 )
                 st.plotly_chart(pie, use_container_width=True)
 
             with chart_cols[1]:
                 monthly = fdf.dropna(subset=["date"]).copy()
                 if not monthly.empty:
-                    monthly["month"] = monthly["date"].dt.to_period("M").astype(str)
+                    monthly["month"] = (
+                        monthly["date"].dt.to_period("M").astype(str)
+                    )
                     agg = monthly.groupby("month", as_index=False)["amount"].sum()
                     bar = px.bar(
-                        agg, x="month", y="amount", title="Monthly Aid (Sum)"
+                        agg,
+                        x="month",
+                        y="amount",
+                        title="Monthly Aid (Sum)"
                     )
                     bar.update_layout(xaxis_title="", yaxis_title="Amount")
                     st.plotly_chart(bar, use_container_width=True)
@@ -606,7 +629,10 @@ else:
                 )
 
             st.markdown("#### Records (filtered)")
-            st.dataframe(fdf.sort_values("date", ascending=False), use_container_width=True)
+            st.dataframe(
+                fdf.sort_values("date", ascending=False),
+                use_container_width=True
+            )
 
     # ==================== ADD AID ====================
     elif menu == "➕ Add Aid":
@@ -618,7 +644,10 @@ else:
                     "Beneficiary Name", placeholder="e.g., Flood Relief Camp #12"
                 )
                 amount = st.number_input(
-                    "Amount Donated", min_value=0.0, step=100.0, help="Use your currency"
+                    "Amount Donated",
+                    min_value=0.0,
+                    step=100.0,
+                    help="Use your currency"
                 )
                 colx, coly = st.columns([1, 1])
                 with colx:
@@ -629,7 +658,8 @@ else:
             if submitted:
                 if donor.strip() and beneficiary.strip():
                     add_aid_record(
-                        donor.strip(), beneficiary.strip(), amount, status, date_input.strftime("%Y-%m-%d")
+                        donor.strip(), beneficiary.strip(),
+                        amount, status, date_input.strftime("%Y-%m-%d")
                     )
                     st.success("Aid record added successfully!")
                     st.toast("Record saved ✅", icon="💾")
@@ -654,7 +684,10 @@ else:
                 )
                 sdf = sdf[mask]
             st.caption("Tip: Use the download button in Dashboard for exports.")
-            st.dataframe(sdf.sort_values("date", ascending=False), use_container_width=True)
+            st.dataframe(
+                sdf.sort_values("date", ascending=False),
+                use_container_width=True
+            )
 
     # ==================== AI AUDIT ====================
     elif menu == "🧠 AI Audit":
@@ -698,7 +731,9 @@ else:
                         "amount": st.column_config.NumberColumn("Amount", format="%.2f"),
                         "date": st.column_config.TextColumn("Date (YYYY-MM-DD)"),
                     },
-                    disabled=["id", "donor", "beneficiary", "amount", "date", "status"],
+                    disabled=[
+                        "id", "donor", "beneficiary", "amount", "date", "status"
+                    ],
                     height=420,
                 )
                 selected_ids = edited.loc[edited["select"], "id"].tolist()
@@ -706,11 +741,16 @@ else:
                 with colD1:
                     st.write(f"Selected: **{len(selected_ids)}**")
                 with colD2:
-                    danger = st.toggle("Require confirmation", value=True, help="Prevents accidental deletion")
+                    danger = st.toggle(
+                        "Require confirmation", value=True,
+                        help="Prevents accidental deletion"
+                    )
                 del_btn = st.button("🗑️ Delete Selected", type="primary")
                 if del_btn:
                     if danger:
-                        sure = st.checkbox("I'm sure. Permanently delete the selected records.")
+                        sure = st.checkbox(
+                            "I'm sure. Permanently delete the selected records."
+                        )
                         if not sure:
                             st.warning("Please confirm before deleting.")
                         else:
@@ -721,4 +761,3 @@ else:
                         delete_records(selected_ids)
                         st.success(f"Deleted {len(selected_ids)} record(s).")
                         st.rerun()
-
